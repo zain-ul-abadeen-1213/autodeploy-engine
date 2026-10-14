@@ -1,0 +1,37 @@
+name: CI/CD Pipeline to EC2
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Deploy to AWS EC2 via SSH
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_KEY }}
+        script: |
+          echo "Connected to EC2 successfully!"
+          # Agar pehle se folder nahi hai toh clone karein, warna pull karein
+          if [ -d "~/autodeploy-engine" ]; then
+            cd ~/autodeploy-engine
+            git pull origin main
+          else
+            git clone https://github.com/zain-ul-abadeen-1213/autodeploy-engine.git ~/autodeploy-engine
+            cd ~/autodeploy-engine
+          fi
+          
+          # Docker image build aur container run karein
+          docker build -t autodeploy-engine:1.0 .
+          docker stop app-container || true
+          docker rm app-container || true
+          docker run -d -p 8000:8000 --name app-container autodeploy-engine:1.0
+          echo "Deployment completed successfully!"
